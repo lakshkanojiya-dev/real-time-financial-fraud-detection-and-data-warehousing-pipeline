@@ -1,0 +1,43 @@
+from datetime import datetime, timedelta
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+
+default_args = {
+    'owner': 'sunbeam',
+    'depends_on_past': False,
+    'start_date': datetime(2025, 1, 1),
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+dag = DAG(
+    'fraud_pipeline_daily',
+    default_args=default_args,
+    description='Daily fraud detection pipeline: batch ETL, partition repair, and cluster monitoring',
+    schedule_interval='0 2 * * *',   # daily at 02:00 UTC
+    catchup=False,
+    tags=['fraud', 'bigdata'],
+)
+
+run_batch_etl = BashOperator(
+    task_id='run_batch_etl',
+    bash_command='/home/sunbeam/fraud_project_enhanced/scripts/run_batch_etl.sh ',
+    dag=dag,
+)
+
+repair_partitions = BashOperator(
+    task_id='repair_hive_partitions',
+    bash_command='/home/sunbeam/fraud_project_enhanced/scripts/repair_hive_partitions.sh ',
+    dag=dag,
+)
+
+check_health = BashOperator(
+    task_id='check_cluster_health',
+    bash_command='/home/sunbeam/fraud_project_enhanced/scripts/monitoring/check_cluster_health.sh ',
+    dag=dag,
+)
+
+# Dependencies
+run_batch_etl >> repair_partitions >> check_health
